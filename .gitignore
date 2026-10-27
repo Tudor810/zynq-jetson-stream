@@ -1,0 +1,42 @@
+# Build outputs
+build/
+bin/
+*.o
+*.a
+*.so
+*.elf
+*.out
+*.exe
+
+# CUDA
+*.ptx
+*.cubin
+*.fatbin
+
+# Vivado / Vitis / PetaLinux
+*.jou
+*.log
+*.str
+.Xil/
+*.cache/
+*.hw/
+*.runs/
+*.sim/
+*.ip_user_files/
+*.gen/
+*.xsa
+*.bit
+_ide/
+.metadata/
+
+# Test outputs (keep test inputs)
+results/
+*.tmp
+
+# Editors / OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+desktop.ini
