@@ -1,142 +1,131 @@
 # Project plan: zynq-jetson-stream
 
-Milestones are checked every 2 weeks, starting Wednesday, 4 November 2026 (week 6).
-Each milestone lists what must be working and demonstrable by that date.
-
 | Week | Date | Milestone |
 |------|------|-----------|
-| 6  | Wed 4 Nov 2026  | Repo and roadmap |
-| 8  | Wed 18 Nov 2026 | Setup and connection only |
-| 10 | Wed 2 Dec 2026  | Complete project (all P7 requirements, plain TCP) |
-| 12 | Wed 16 Dec 2026 | Improvement: custom UDP protocol and streaming pipeline |
-| 14 | TBD (after winter break, check the calendar) | Final measurements, report, demo |
+| 6  | Wed 4 Nov 2026  | GitHub, plan, project decision |
+| 8  | Wed 18 Nov 2026 | Zybo ↔ Jetson communication over Ethernet (TCP), text in terminal, image on HDMI |
+| 10 | Wed 2 Dec 2026  | CUDA processing on the Jetson and integration with week 8 (baseline complete) |
+| 12 | Wed 16 Dec 2026 | Improvement (variants) |
+| 14 | Wed 6 Jan 2027| Final measurements, report, demo |
 
 ---
 
-## Week 6: Repo and roadmap (Wed 4 Nov)
+## Week 6: GitHub, plan, project decision (Wed 4 Nov)
 
-**Goal:** project skeleton and plan exist, key hardware decisions made.
+**Goal:** project skeleton and plan, key decisions made.
 
 - [x] Private GitHub repo created, first commit pushed
 - [x] Project layout created (`src/zynq/`, `src/jetson/`, `src/common/`, `docs/`)
 - [x] Milestone plan written (`docs/plan.md`)
-- [x] Decide the Zynq board (ZYBO or PYNQ) and how it runs: Linux (PetaLinux / PYNQ image) or bare-metal
-
-**Demo:** repo and plan.
+- [x] Project decision: P7 (Zybo Z7-20 ↔ Jetson Orin Nano)
 
 ---
 
-## Week 8: Setup and connection only (Wed 18 Nov)
+## Week 8: Communication Zybo → Jetson → Zybo (Wed 18 Nov)
 
-**Goal:** both boards run, talk to each other, and a text file goes from the Zynq SD card to the Jetson. The display path is checked early because it is the riskiest base requirement.
+**Goal:** both boards run and exchange data over Ethernet with plain TCP. The Jetson only echoes the data back unchanged (no CUDA yet), which validates the whole path before processing is added. The text goes to the terminal and the image goes to the display.
 
-- [ ] Linux booting on the Zynq from the SD card; SD card contents readable
+**Setup**
+- [ ] Zybo: Linux booting from the SD card (PetaLinux image from Digilent's BSP), SD card contents readable
+- [ ] Zybo: how code is built (cross-compile on PC)
 - [ ] Jetson set up: CUDA toolkit works, a trivial kernel compiles with `nvcc` and runs
 - [ ] Ethernet link: static IPs on both boards, `ping` works in both directions
-- [ ] Cross-compiling (or compiling on-board) C code for the Zynq works
-- [ ] First TCP transfer: Zynq reads the text file from SD and sends it, Jetson receives and prints it
-- [ ] Message format drafted in `src/common/` (header with type, size; text vs. image)
-- [ ] Prep for week 10: find out which video output the Zynq can use (HDMI / LCD / other) and show a test pattern on it
-- [ ] **Present the improvement idea (streaming pipeline over custom UDP) to the teacher for approval**
 
-**Demo:** text file sent Zynq → Jetson over TCP; test pattern on the Zynq display (or a clear status on what is blocking it).
+**Communication (TCP)**
+- [ ] Message format in `src/common/` (header with type, size; text vs. image)
+- [ ] Zybo reads the text file and the image from the SD card and sends them
+- [ ] Jetson receives both and sends them back unchanged (echo)
+- [ ] Text shown in the terminal on the Zybo
+- [ ] Transfer validation: size check + checksum (e.g. CRC32) on both sides
+- [ ] Image loading/saving in a simple format (PPM/PGM or raw RGB), no external libraries
+
+**Display**
+- [ ] Image shown through HDMI on the Zybo (needs fabric logic: VDMA + RGB-to-DVI, plus a Linux driver or device tree entry)
+- [ ] **HDMI deadline: start of week 9.** If there is no image on screen by then, switch to the fallback: a small SPI LCD on the PS-connected Pmod, or saving the result to a file for now
+
+
+**Demo:** text and image sent Zybo → Jetson → Zybo over TCP; text in the terminal; image on HDMI (or the agreed fallback).
 
 ---
 
-## Week 10: Complete project, plain TCP (Wed 2 Dec)
+## Week 10: CUDA processing and integration (Wed 2 Dec)
 
-**Goal:** the whole P7 flow works end to end with plain TCP, validated and measured. This is the safety net: everything required for the base grade exists.
+**Goal:** the whole P7 flow works end to end, validated and measured.
 
-Suggested order inside the week: (1) round trip with a dummy kernel, (2) real CUDA kernels, (3) display, (4) CPU reference and validation, (5) measurements. Put timers into the code while writing the round trip, not afterwards.
-
-**Round trip and I/O**
-- [ ] Zynq sends both the image and the text file; Jetson replies with both results
-- [ ] Text processing on Jetson: lowercase → uppercase
-- [ ] Image loading/saving in a simple format (e.g. PPM/PGM or raw RGB) to avoid external libraries
-- [ ] Processed image and text sent back to the Zynq; text saved to SD / printed in terminal
-- [ ] Transfer validation: size check + checksum (e.g. CRC32) on both sides
-
-**CUDA kernels (own implementations)**
-- [ ] grayscale conversion
-- [ ] Gaussian blur
-- [ ] Sobel edge detection
-- [ ] binarization (threshold)
-
-**Display**
-- [ ] Display the result image on the Zynq (HDMI / LCD / other available video interface, as agreed with the teacher)
+**Processing on the Jetson**
+- [ ] Text: lowercase → uppercase
+- [ ] CUDA kernels (own implementations):
+  - [ ] grayscale conversion
+  - [ ] Gaussian blur
+  - [ ] Sobel edge detection
+  - [ ] binarization (threshold)
+- [ ] Processed image and text sent back to the Zybo
+- [ ] Zybo shows the processed image and prints or saves the modified text (SD card or terminal)
 
 **CPU reference and validation**
-- [ ] CPU reference implementations of all four image operations on the Jetson
+- [ ] CPU implementations of all four image operations on the Jetson
 - [ ] Output validation: compare GPU output with CPU output pixel by pixel (max difference / number of different pixels)
 
 **Measurements**
 - [ ] Measurement setup: repeated runs, several image sizes (e.g. 640×480, 1280×720, 1920×1080, 4K), average and spread
-- [ ] Separate timings: Zynq → Jetson transfer, host ↔ device copies, kernel time, Jetson → Zynq transfer, total
+- [ ] Separate timings: Jetson processing (host ↔ device copies, kernel time), Zybo round trip, and transfer estimated as round trip minus Jetson processing time (the two boards' clocks are not synchronized, so no cross-board timestamps)
 - [ ] Speedup CPU vs. GPU (kernel only and including memory copies)
 
-**Wrap-up**
-- [ ] Tag the repo `baseline-complete`
+**Demo:** image + text round trip with processing, result shown on the Zybo, table of CPU vs. GPU times.
 
-**Demo:** image + text round trip, result shown on the Zynq display, table of CPU vs. GPU times.
-
-**Fallback:** if time runs out, the CPU reference and measurements can finish in the first days of week 12, since they do not depend on the improvement.
+**Fallback:** if time runs out, the later measurement runs can finish in the first days of week 12.
 
 ---
 
-## Week 12: Improvement, custom UDP and streaming (Wed 16 Dec)
+## Week 12: Improvement, variants (Wed 16 Dec)
 
-**Goal:** the improvement works and shows a measurable benefit.
+**Goal:** one or more improvements that work and can be shown. 
 
-**Custom reliable protocol over UDP (build in stages)**
-- [ ] packet header: sequence number, type, length, checksum
-- [ ] stop-and-wait: ACKs and retransmission on timeout
-- [ ] whole-image transfer works over it and matches the TCP version byte for byte
-- [ ] sliding window (stretch goal; streaming with stop-and-wait already shows the overlap benefit)
+**Rules for any variant**
+- Each improvement can be switched on or off (config flag), so the report can show baseline, each improvement alone, and all together
+- Every new CUDA kernel gets a CPU reference and a validation against it
+- Keep the Zybo side simple: results must also be shown in the terminal or as files, not only on HDMI
 
-**Streaming pipeline**
-- [ ] Image split into strips of rows, each strip sent as soon as it is read
-- [ ] Halo rows: each strip carries the extra border rows needed by Gaussian and Sobel
-- [ ] Jetson processes each strip as soon as it arrives (CUDA streams), overlapping network and GPU work
-- [ ] Results streamed back strip by strip and reassembled on the Zynq
+**Variant A: more speed in the transfer**
+- [ ] Output bit-packed (1 bit per pixel) for the binarized image
+- [ ] Jumbo frames (MTU 9000) and larger socket buffers, if the Zybo Ethernet driver supports them
+- [ ] Streaming pipeline: image split into strips of rows, each strip sent as soon as it is read, with halo rows for Gaussian and Sobel, CUDA streams on the Jetson, results streamed back and reassembled; first over TCP, then compared with the baseline
+- [ ] Custom reliable protocol over UDP, built in stages: header (sequence number, type, length, checksum) → stop-and-wait with ACKs and timeout retransmission → sliding window 
+- [ ] Packet loss test: drop packets on purpose and check the result is still correct
 
-**Validation and comparison**
-- [ ] Output identical to the non-streaming version (validation)
-- [ ] Packet loss test: drop packets on purpose and confirm retransmission still gives a correct result
-- [ ] Comparison: total latency of the baseline (TCP, send all → process all → send back) vs. streaming pipeline
+**Variant B: faster CUDA kernels**
+- [ ] Separable Gaussian blur (two 1D passes)
+- [ ] Shared memory tiling for blur and Sobel
+- [ ] Kernel fusion (grayscale + blur + Sobel + threshold)
+- [ ] Pinned / zero-copy memory (the Orin Nano shares RAM between CPU and GPU)
 
-**Optional extras, only if time allows**
-- [ ] kernel fusion (grayscale + blur + Sobel in one kernel)
-- [ ] zero-copy / pinned memory on the Jetson (shared CPU/GPU RAM)
-- [ ] bit-packed binary output (1 bit per pixel) for the return transfer
+**Variant C: extra functionality on the Jetson**
+- [ ] Full Canny (non-maximum suppression and double-threshold hysteresis on top of blur and Sobel)
+- [ ] Histogram equalization (histogram with `atomicAdd`, then remap)
+- [ ] Morphological operations (erosion, dilation) on the binarized image
+- [ ] Object counting via connected components on the binarized image (the Jetson returns a number as well as an image)
+- [ ] Text statistics (letter frequency, word count) computed on the GPU
+- [ ] Optional, more ambitious: median filter, Harris corners, Hough lines
 
-**Demo:** same image, baseline vs. streaming, with the latency difference.
+**Variant D: using the returned results on the Zybo**
+- [ ] Configurable pipeline: Zybo buttons/switches pick the operations and parameters (threshold, sigma), sent to the Jetson in a control message
+- [ ] Image sequence from the SD card with motion detection (frame difference with a threshold), shown as a short sequence
+- [ ] Overlay: the Zybo draws the detected edges or objects over the original image
+
+**Demo:** the chosen improvements shown against the baseline, with the difference in times or in functionality.
 
 ---
 
 ## Week 14: Final measurements, report and demo (date TBD)
 
-**Goal:** everything measured, documented and ready to present. If the date turns out to be late January, use the extra buffer for the optional extras from week 12.
+**Goal:** everything measured, documented and ready to present. 
 
-- [ ] Final measurement runs for all configurations and image sizes
+- [ ] Final measurement runs for all configurations and image sizes (baseline, each improvement alone, all together)
 - [ ] Charts: transfer time, processing time, total time, speedup
-- [ ] Technical report: architecture, protocol design, CUDA kernels, implementation, tests, results and analysis
+- [ ] Technical report: architecture, protocol design, CUDA kernels, implementation, tests, results and analysis 
 - [ ] README updated with build and run instructions for both boards
-- [ ] Demo script rehearsed (boot both boards, run baseline, run streaming, show results)
 - [ ] Code cleaned up, final commit
 
 **Deliverables:** working demo, technical report, private repository with regular commits.
 
----
 
-## Grading checklist (from the assignment)
-
-| Requirement | Where it is covered |
-|---|---|
-| Working implementation | Weeks 8 to 10 |
-| Effective GPU use (own CUDA kernels) | Week 10 |
-| Result validation | Weeks 10 to 12 |
-| Software reference implementation (CPU) | Week 10 (fallback: start of week 12) |
-| Optimization through parallelism / pipeline / memory | Week 12 |
-| Execution time measurement (transfer + processing, compute + total) | Weeks 10 to 14 |
-| Speedup calculation | Weeks 10 to 14 |
-| Technical report and demo | Week 14 |
