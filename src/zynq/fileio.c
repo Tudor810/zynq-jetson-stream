@@ -15,6 +15,8 @@ int file_read_all(const char *path, uint8_t **data, size_t *size)
 
     uint8_t *buf = NULL;
     size_t total = 0;
+    size_t got = 0;
+    struct stat statbuf;
     *data = NULL;
     *size = 0;
     int err = ERR_OK;
@@ -25,13 +27,10 @@ int file_read_all(const char *path, uint8_t **data, size_t *size)
         goto cleanup;
     }
     
-    struct stat statbuf;
-
     if(fstat(fd, &statbuf) == -1) {
         err = ERR_FILE_OPEN;
         goto cleanup;
     }
-
 
     if(!S_ISREG(statbuf.st_mode)) {
         err = ERR_FILE_READ;
@@ -46,8 +45,6 @@ int file_read_all(const char *path, uint8_t **data, size_t *size)
         goto cleanup;
     } 
 
-    size_t got = 0;
-
     while(got < total) {
         ssize_t n = read(fd, buf + got, total - got);
         if(n < 0) {
@@ -56,7 +53,6 @@ int file_read_all(const char *path, uint8_t **data, size_t *size)
             err = ERR_FILE_READ;
             goto cleanup;
         }
-
 
         if(n == 0) 
             break;
@@ -85,10 +81,47 @@ int file_write_all(const char *path, const void *data, size_t size)
     if (path == NULL || (size > 0 && data == NULL))
         return ERR_ARGS;
 
-    /* TODO:
-     *   1. open() with O_WRONLY | O_CREAT | O_TRUNC, mode 0644
-     *   2. write() in a loop until all bytes are written
-     *   3. close() and check its return value
-     */
-    return ERR_FILE_WRITE;
+    const uint8_t *p = (const uint8_t *)data;
+    int err = ERR_OK;
+    int fd = open(path, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+
+    if(fd < 0) {
+        err = ERR_FILE_OPEN;
+        goto cleanup;
+    }
+
+    size_t got = 0;
+
+    while(got < size) {
+        ssize_t n = write(fd, p + got, size - got);
+        if(n < 0) {
+            if(errno == EINTR) 
+                continue;
+            err = ERR_FILE_WRITE;
+            goto cleanup;
+        }
+
+        if(n == 0) 
+            break;
+        got += (size_t)n;
+    }
+
+    if(got != size) {
+        err = ERR_FILE_WRITE;
+        goto cleanup;
+    }
+
+    if(fsync(fd) < 0) {
+        err = ERR_FILE_WRITE;
+        goto cleanup;
+    }
+
+    if(close(fd) < 0) 
+        err = ERR_FILE_WRITE;
+    fd = -1;
+
+cleanup:
+    if(fd >= 0) 
+        close(fd);
+    return err;
 }
