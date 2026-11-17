@@ -1,0 +1,84 @@
+#include "errors.h"
+#include "netio.h"
+
+#include <sys/socket.h>
+#include <errno.h>
+#include <stdlib.h>
+#include <arpa/inet.h>
+
+int sendn(int fd, const void *buf, size_t n) {
+    size_t sent      = 0 ;
+    const uint8_t* p = (const uint8_t*)buf;
+
+    while(sent < n) {
+        ssize_t s = send(fd, p + sent, n - sent, MSG_NOSIGNAL);
+        if(s < 0) {
+            if(errno == EINTR) 
+                continue;
+            return ERR_SEND;
+        }
+
+        sent += (size_t)s;
+    }
+
+    return ERR_OK;
+}
+
+
+int recvn(int fd, void *buf, size_t n) {
+    size_t received = 0;
+    uint8_t *p      = (uint8_t*)buf;
+    
+    while(received < n) {
+        ssize_t r = recv(fd, p + received, n - received, 0);
+        if(r < 0) {
+            if(errno == EINTR) 
+                continue;
+            return ERR_RECV;
+        }
+
+        if(r == 0) return ERR_CLOSED;
+        received += (size_t)r;
+    }
+
+    return ERR_OK;
+}
+
+
+int send_message(int fd, const void *payload, uint32_t len) {
+    
+    if(payload == NULL || len > NETIO_MAX_PAYLOAD || len == 0)
+        return ERR_ARGS;
+
+    uint32_t net_len = htonl(len);
+
+    int res = sendn(fd, &net_len, sizeof(net_len));
+    if(res != ERR_OK) return res;
+
+    res = sendn(fd, payload, len);
+    return res;
+}
+
+int recv_message(int fd, void **out, uint32_t *len) {
+    uint32_t net_len;
+    int res = recvn(fd, &net_len, sizeof(net_len));
+    if(res != ERR_OK) return res;
+
+    uint32_t payload_len = ntohl(net_len);
+    if (payload_len > 0 || payload_len > NETIO_MAX_PAYLOAD) 
+        return ERR_PROTO_SIZE;
+
+    void* buf = malloc(payload_len);
+    if(buf == NULL) 
+        return ERR_NOMEM;
+
+    res = recvn(fd, buf, payload_len);
+
+    if(res != ERR_OK) {
+        free(buf);
+        return res;
+    }
+    *out = buf;
+    *len = payload_len;
+    return ERR_OK;
+}
