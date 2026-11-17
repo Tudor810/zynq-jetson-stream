@@ -62,13 +62,15 @@ int send_message(int fd, const void *payload, uint32_t len) {
 int recv_message(int fd, void **out, uint32_t *len) {
     uint32_t net_len;
     int res = recvn(fd, &net_len, sizeof(net_len));
+
     if(res != ERR_OK) return res;
 
     uint32_t payload_len = ntohl(net_len);
-    if (payload_len > 0 || payload_len > NETIO_MAX_PAYLOAD) 
+
+    if (payload_len == 0 || payload_len > NETIO_MAX_PAYLOAD) 
         return ERR_PROTO_SIZE;
 
-    void* buf = malloc(payload_len);
+    uint8_t* buf = malloc(payload_len + 1);
     if(buf == NULL) 
         return ERR_NOMEM;
 
@@ -78,6 +80,9 @@ int recv_message(int fd, void **out, uint32_t *len) {
         free(buf);
         return res;
     }
+
+    buf[payload_len] = '\0';
+
     *out = buf;
     *len = payload_len;
     return ERR_OK;
