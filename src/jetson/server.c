@@ -9,10 +9,8 @@
 #include <netinet/in.h>
 #include <sys/socket.h>
 
-#define PORT 5000
 
-
-void uppercase_text(uint8_t* buf, uint32_t len) {
+static void uppercase_text(uint8_t* buf, uint32_t len) {
     for(uint32_t i = 0; i < len;i++) {
         if(buf[i] >= 'a' && buf[i] <= 'z') {
             buf[i] = buf[i] - 'a' + 'A';
@@ -47,14 +45,14 @@ int main(void) {
     struct sockaddr_in addr = {0};
     addr.sin_family         = AF_INET;
     addr.sin_addr.s_addr    = htonl(INADDR_ANY);
-    addr.sin_port           = htons(PORT);
+    addr.sin_port           = htons(DEFAULT_PORT);
 
     if(bind(server_fd, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
         err = ERR_SOCKET;
         where = "bind";
         goto cleanup;
     }
-    printf("[server] bound to port %d\n", PORT);
+    printf("[server] bound to port %d\n", DEFAULT_PORT);
 
     if(listen(server_fd, 1) < 0) {
         err = ERR_SOCKET;
@@ -85,11 +83,17 @@ int main(void) {
     }
 
     uppercase_text(buf, len);
-    
+
     printf("[server] received %u bytes:\n", len);
     printf("---------- text ----------\n");
     printf("%.*s\n", (int)len, (char *)buf);
     printf("--------------------------\n");
+
+    err = send_message(client_fd, buf, len);
+    if(err != ERR_OK) {
+        where = "send_message";
+        goto cleanup;
+    }
 
 cleanup:
     if(err != ERR_OK) err_print(where, err);   /* print before close() changes errno */

@@ -16,6 +16,9 @@
 /* Largest payload accepted by recv_message (protects against bad lengths). */
 #define NETIO_MAX_PAYLOAD (64u * 1024u * 1024u)
 
+/* Default server port - lives in common so that both client and server knows about it*/
+#define DEFAULT_PORT 5000
+
 /*
  * Send exactly n bytes from buf.
  * Returns ERR_OK or ERR_SEND (see errno).
