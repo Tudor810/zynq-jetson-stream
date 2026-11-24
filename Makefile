@@ -16,7 +16,7 @@ BUILD  := build
 COMMON := src/common/errors.c src/common/netio.c
 
 # Each side's own files
-ZYNQ   := src/zynq/main.c src/zynq/fileio.c
+ZYNQ   := src/zynq/main.c src/zynq/fileio.c src/zynq/image.c
 JETSON := src/jetson/server.c
 
 .PHONY: all zynq jetson clean

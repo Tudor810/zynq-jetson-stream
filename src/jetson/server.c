@@ -1,6 +1,7 @@
 #include "common/errors.h"
 #include "common/netio.h"
 
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -17,23 +18,60 @@ static void uppercase_text(uint8_t* buf, uint32_t len) {
         }
     }
 }
+
+static void handle_client(int client_fd) {
+    void *buf = NULL;
+    uint32_t len = 0;
+    int rc;
+
+    while(1) {
+        printf("[server] waiting for a message...\n");
+
+        errno = 0;
+        rc = recv_message(client_fd, &buf, &len);
+        if(rc == ERR_CLOSED) {
+            printf("[server] client disconnected\n");
+            break;
+        }
+
+        if(rc != ERR_OK) {
+            err_print("recv_message", rc);
+            break;
+        }
+
+        printf("[server] received %u bytes:\n", len);
+        // printf("---------- text ----------\n");
+        // printf("%.*s\n", (int)len, (char *)buf);
+        // printf("--------------------------\n");
+
+        uppercase_text(buf, len);
+
+        rc = send_message(client_fd, buf, len);
+        free(buf);
+        buf = NULL;
+
+        if(rc != ERR_OK) {
+            err_print("send_message", rc);
+            break;
+        }
+        printf("[server] sent %u bytes back\n", len);
+    }
+}
+
 int main(void) {
     int server_fd = -1;
-    int client_fd = -1;
     int err = ERR_OK;
-    const char *where = "server";   /* which step failed, for the error message */
-    uint32_t len = 0;
-    void *buf = NULL;
+    const char *where = "server";   /* which setup step failed */
 
     printf("[server] starting...\n");
 
+     /* ---- 1. setup ---- */
     server_fd = socket(AF_INET, SOCK_STREAM, 0);
     if(server_fd < 0) {
         err = ERR_SOCKET;
         where = "socket";
         goto cleanup;
     }
-    printf("[server] socket created\n");
 
     int opt = 1;
     if(setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
@@ -52,58 +90,42 @@ int main(void) {
         where = "bind";
         goto cleanup;
     }
-    printf("[server] bound to port %d\n", DEFAULT_PORT);
 
     if(listen(server_fd, 1) < 0) {
         err = ERR_SOCKET;
         where = "listen";
         goto cleanup;
     }
-    printf("[server] listening, waiting for a client...\n");
+    printf("[server] listening on port %d (Ctrl+C to stop)\n", DEFAULT_PORT);
 
-    struct sockaddr_in client_addr = {0};
-    socklen_t client_len = sizeof(client_addr);
-    client_fd = accept(server_fd, (struct sockaddr *)&client_addr, &client_len);
-    if(client_fd < 0) {
-        err = ERR_SOCKET;
-        where = "accept";
-        goto cleanup;
+    /* ---- 2. accept clients ---- */
+
+    while(1) {
+        struct sockaddr_in client_addr = {0};
+        socklen_t client_len = sizeof(client_addr);
+
+        printf("[server] waiting for a client...\n");
+
+        int client_fd = accept(server_fd, (struct sockaddr *)&client_addr, &client_len);
+        if(client_fd < 0) {
+            err_print("accept", ERR_SOCKET);
+            continue;
+        }
+
+        char client_ip[INET_ADDRSTRLEN] = "?";
+        inet_ntop(AF_INET, &client_addr.sin_addr, client_ip, sizeof(client_ip));
+        printf("[server] client connected from %s:%d\n",
+            client_ip, ntohs(client_addr.sin_port));
+
+        handle_client(client_fd);
+
+        close(client_fd);
+        printf("[server] connection with %s closed\n\n", client_ip);
     }
-
-    char client_ip[INET_ADDRSTRLEN] = "?";
-    inet_ntop(AF_INET, &client_addr.sin_addr, client_ip, sizeof(client_ip));
-    printf("[server] client connected from %s:%d\n",
-           client_ip, ntohs(client_addr.sin_port));
-
-    printf("[server] waiting for a message...\n");
-    err = recv_message(client_fd, &buf, &len);
-    if(err != ERR_OK) {
-        where = "recv_message";
-        goto cleanup;
-    }
-
-    uppercase_text(buf, len);
-
-    printf("[server] received %u bytes:\n", len);
-    printf("---------- text ----------\n");
-    printf("%.*s\n", (int)len, (char *)buf);
-    printf("--------------------------\n");
-
-    err = send_message(client_fd, buf, len);
-    if(err != ERR_OK) {
-        where = "send_message";
-        goto cleanup;
-    }
-
+    
 cleanup:
     if(err != ERR_OK) err_print(where, err);   /* print before close() changes errno */
-
-    if(client_fd >= 0) {
-        close(client_fd);
-        printf("[server] client connection closed\n");
-    }
     if(server_fd >= 0) close(server_fd);
-    free(buf);
 
     printf("[server] stopped (%s)\n", err == ERR_OK ? "ok" : "error");
     return err == ERR_OK ? EXIT_SUCCESS : EXIT_FAILURE;

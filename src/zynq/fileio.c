@@ -69,7 +69,7 @@ int file_read_all(const char *path, uint8_t **data, size_t *size)
     *size = total;
     buf = NULL;
 
-    cleanup: 
+cleanup: 
     if(fd >= 0) close(fd);
     if(buf)     free(buf);
 
