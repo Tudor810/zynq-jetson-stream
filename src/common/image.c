@@ -1,6 +1,6 @@
 #include "image.h"
 #include "fileio.h"
-#include "common/errors.h"
+#include "errors.h"
 
 #include <stdlib.h>
 #include <string.h>

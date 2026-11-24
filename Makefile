@@ -13,10 +13,10 @@ CFLAGS += -Isrc
 BUILD  := build
 
 # Code used by both programs
-COMMON := src/common/errors.c src/common/netio.c
+COMMON := src/common/errors.c src/common/netio.c src/common/protocol.c src/common/image.c src/common/fileio.c
 
 # Each side's own files
-ZYNQ   := src/zynq/main.c src/zynq/fileio.c src/zynq/image.c
+ZYNQ   := src/zynq/client.c 
 JETSON := src/jetson/server.c
 
 .PHONY: all zynq jetson clean

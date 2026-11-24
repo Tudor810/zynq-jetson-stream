@@ -1,5 +1,5 @@
 #include "common/errors.h"
-#include "common/netio.h"
+#include "common/protocol.h"
 
 #include <errno.h>
 #include <stdio.h>
@@ -83,7 +83,7 @@ int main(void) {
     struct sockaddr_in addr = {0};
     addr.sin_family         = AF_INET;
     addr.sin_addr.s_addr    = htonl(INADDR_ANY);
-    addr.sin_port           = htons(DEFAULT_PORT);
+    addr.sin_port           = htons(PROTO_DEFAULT_PORT);
 
     if(bind(server_fd, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
         err = ERR_SOCKET;
@@ -96,7 +96,7 @@ int main(void) {
         where = "listen";
         goto cleanup;
     }
-    printf("[server] listening on port %d (Ctrl+C to stop)\n", DEFAULT_PORT);
+    printf("[server] listening on port %d (Ctrl+C to stop)\n", PROTO_DEFAULT_PORT);
 
     /* ---- 2. accept clients ---- */
 
