@@ -14,6 +14,7 @@ BUILD  := build
 
 # Code used by both programs
 COMMON := src/common/errors.c src/common/netio.c src/common/protocol.c src/common/image.c src/common/fileio.c
+HEADERS := $(wildcard src/common/*.h)
 
 # Each side's own files
 ZYNQ   := src/zynq/client.c 
@@ -26,11 +27,11 @@ all: zynq jetson
 zynq: $(BUILD)/zynq_client
 jetson: $(BUILD)/jetson_server
 
-$(BUILD)/zynq_client: $(ZYNQ) $(COMMON) | $(BUILD)
-	$(CC) $(CFLAGS) -o $@ $(ZYNQ) $(COMMON)
+$(BUILD)/zynq_client: $(ZYNQ) $(COMMON) $(HEADERS) | $(BUILD)
+	$(CC) $(CFLAGS) -o $@ $(ZYNQ) $(COMMON) $(HEADERS)
 
-$(BUILD)/jetson_server: $(JETSON) $(COMMON) | $(BUILD)
-	$(CC) $(CFLAGS) -o $@ $(JETSON) $(COMMON)
+$(BUILD)/jetson_server: $(JETSON) $(COMMON) $(HEADERS) | $(BUILD)
+	$(CC) $(CFLAGS) -o $@ $(JETSON) $(COMMON) $(HEADERS)
 
 $(BUILD):
 	mkdir -p $(BUILD)

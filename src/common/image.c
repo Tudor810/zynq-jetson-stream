@@ -6,6 +6,9 @@
 #include <string.h>
 #include <stdio.h>
 
+#define PPM_MAX_VALUE 255
+#define PPM_NUMBER_LIMIT 100000000
+
 /* True for the whitespace characters allowed in a PPM header. */
 static int is_space(uint8_t c)
 {
@@ -137,7 +140,7 @@ int image_parse_ppm(const uint8_t *data, size_t size, image_t *img) {
         (rc = read_number(data, size, &pos, &maxval)) != ERR_OK)
             return rc;
 
-    if(maxval != 255) {
+    if(maxval != PPM_MAX_VALUE) {
         return ERR_UNSUPPORTED;
     }
 

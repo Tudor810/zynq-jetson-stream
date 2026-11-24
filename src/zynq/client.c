@@ -92,13 +92,15 @@ int main(int argc, char **argv)
     }
 
     /* ---- 2. read the files ---- */
+    errno = 0;
     rc = file_read_all(argv[2], &text, &text_size);
     if (rc != ERR_OK) { err_print(argv[2], rc); goto cleanup; }
 
+    errno = 0;
     rc = image_load_ppm(argv[1], &image);
     if (rc != ERR_OK) { err_print(argv[1], rc); goto cleanup; }
 
-    printf("[client] text: %zu bytes, image: %ux%u, %u chanell(s)\n", text_size, image.height, image.width, image.channels);
+    printf("[client] text: %zu bytes, image: %ux%u, %u channel(s)\n", text_size, image.width, image.height, image.channels);
     
     if(text_size == 0 || text_size > PROTO_MAX_PAYLOAD) {
         fprintf(stderr, "[client] text file must be 1 byte to %u bytes\n", PROTO_MAX_PAYLOAD);
@@ -200,13 +202,13 @@ int main(int argc, char **argv)
     result.pixels   = reply;
     reply = NULL;
 
-    rc = image_save_ppm("resources/output.ppm", &result);
+    rc = image_save_ppm("results/output.ppm", &result);
     if(rc != ERR_OK) {
         err_print("image_save_ppm", rc);
         goto cleanup;
     }
 
-    printf("[client] result saved to resources/output.ppm");
+    printf("[client] result saved to results/output.ppm\n");
     exit_code = EXIT_SUCCESS;
 
 cleanup:

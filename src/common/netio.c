@@ -3,8 +3,6 @@
 
 #include <sys/socket.h>
 #include <errno.h>
-#include <stdlib.h>
-#include <arpa/inet.h>
 
 int sendn(int fd, const void *buf, size_t n) {
     size_t sent      = 0 ;

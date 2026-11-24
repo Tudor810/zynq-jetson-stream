@@ -14,8 +14,7 @@
 #include <stdint.h>
 
 #define IMAGE_MAX_SIDE 8192
-#define PPM_MAX_VALUE 255
-#define PPM_NUMBER_LIMIT 100000000
+
 
 typedef struct {
     uint32_t width;
