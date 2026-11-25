@@ -3,6 +3,7 @@
 #include "common/image.h"
 #include "common/timing.h"
 #include "filters.h"
+#include "pipeline.h"
 
 #include <errno.h>
 #include <stdio.h>
@@ -78,14 +79,19 @@ static int handle_image(int client_fd, const msg_header_t *hdr, const uint8_t *b
         .pixels   = (uint8_t *)buf
     };
     image_t result = {0};
-    uint64_t t0 = time_now_us();
+    pipeline_config_t config = PIPELINE_CONFIG_DEFAULT;
+    pipeline_times_t times = {0};
+
     errno = 0;
-    int rc = cpu_grayscale(&image, &result);
-    uint32_t elapsed_us = (uint32_t)(time_now_us() - t0);
+    int rc = run_pipeline(&image, &result, &config, &times);
+
+    printf("[server] pipeline: gray %u us, blur %u us, sobel %u us, threshold %u us, total %u us\n",
+       times.grayscale_us, times.blur_us, times.sobel_us,
+       times.threshold_us, times.total_us);
 
     if (rc != ERR_OK) {
-        err_print("cpu_grayscale", rc);
-        return send_error(client_fd, "grayscale failed", rc);
+        err_print("run_pipeline", rc);
+        return send_error(client_fd, "pipeline", rc);
     }
 
     msg_header_t info = {
@@ -93,7 +99,7 @@ static int handle_image(int client_fd, const msg_header_t *hdr, const uint8_t *b
         .width          = result.width,
         .height         = result.height,
         .channels       = result.channels,
-        .server_time_us = elapsed_us 
+        .server_time_us = times.total_us
     };
     
     errno = 0;
@@ -105,7 +111,7 @@ static int handle_image(int client_fd, const msg_header_t *hdr, const uint8_t *b
     }
 
     printf("[server] sent IMAGE_RESULT: %ux%u, %u channel(s) (processing %u us)\n",
-       info.width, info.height, info.channels, elapsed_us);
+       info.width, info.height, info.channels, times.total_us);
 
     return ERR_OK;
 }

@@ -18,7 +18,7 @@ HEADERS := $(wildcard src/common/*.h)
 
 # Each side's own files
 ZYNQ   := src/zynq/client.c 
-JETSON := src/jetson/server.c src/jetson/filters_cpu.c
+JETSON := src/jetson/server.c src/jetson/filters_cpu.c src/jetson/pipeline.c
 
 .PHONY: all zynq jetson clean
 
