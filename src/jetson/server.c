@@ -1,5 +1,7 @@
 #include "common/errors.h"
 #include "common/protocol.h"
+#include "common/image.h"
+#include "common/timing.h"
 
 #include <errno.h>
 #include <stdio.h>
@@ -14,47 +16,122 @@
 static void uppercase_text(uint8_t* buf, uint32_t len) {
     for(uint32_t i = 0; i < len;i++) {
         if(buf[i] >= 'a' && buf[i] <= 'z') {
-            buf[i] = buf[i] - 'a' + 'A';
+            buf[i] = (uint8_t)(buf[i] - 'a' + 'A');
         }
     }
 }
 
+static int send_error(int client_fd, const char *err) {
+    msg_header_t info = {.type = MSG_ERROR};
+
+    errno = 0;
+    int rc = proto_send(client_fd, &info, err, (uint32_t)strlen(err));
+    if(rc != ERR_OK) {
+        err_print("proto_send (ERROR)", rc);
+        return rc;
+    }
+
+    printf("[server] sent ERROR: %s\n", err);
+
+    return ERR_OK;
+}
+
+static int handle_text(int client_fd, const msg_header_t *hdr, uint8_t *buf) {
+    printf("[server] received TEXT: %u bytes\n", hdr->payload_size);
+
+    
+    uint64_t t0 = time_now_us();
+    uppercase_text(buf, hdr->payload_size);
+    uint32_t elapsed_us = (uint32_t)(time_now_us() - t0);
+
+    msg_header_t info = {
+        .type           = MSG_TEXT_RESULT, 
+        .server_time_us = elapsed_us, 
+        .payload_size   = hdr->payload_size
+    };
+
+    errno = 0;
+    int rc = proto_send(client_fd, &info, buf, hdr->payload_size);
+    if(rc != ERR_OK) {
+        err_print("proto_send (TEXT_RESULT)", rc);
+        return rc;
+    }
+
+    printf("[server] sent TEXT_RESULT: %u bytes (processing %u us)\n",
+       hdr->payload_size, elapsed_us);
+
+    return ERR_OK;
+}
+
+static int handle_image(int client_fd, const msg_header_t *hdr, const uint8_t *buf) {
+    printf("[server] received IMAGE: %ux%u, %u channel(s), %u bytes\n",
+       hdr->width, hdr->height, hdr->channels, hdr->payload_size);
+    
+    uint64_t t0 = time_now_us();
+    // image_t result;
+    // take time 
+    // process image
+    // take time
+    uint32_t elapsed_us = (uint32_t)time_now_us() - t0;
+    msg_header_t info = {
+        .type           = MSG_IMAGE_RESULT,
+        .width          = hdr->width,
+        .height         = hdr->height,
+        .channels       = hdr->channels,
+        .payload_size   = hdr->payload_size,
+        .server_time_us = elapsed_us 
+    };
+    
+    errno = 0;
+    int rc = proto_send(client_fd, &info, buf, hdr->payload_size);
+    if(rc != ERR_OK) {
+        err_print("proto_send (IMAGE_RESULT)", rc);
+        return rc;
+    }
+
+    printf("[server] sent IMAGE_RESULT: %ux%u, %u channel(s) (processing %u us)\n",
+       info.width, info.height, info.channels, elapsed_us);
+
+    return ERR_OK;
+}
+
 static void handle_client(int client_fd) {
-    void *buf = NULL;
-    uint32_t len = 0;
+    uint8_t *buf = NULL;
+    msg_header_t hdr = {0};
     int rc;
 
     while(1) {
         printf("[server] waiting for a message...\n");
 
         errno = 0;
-        rc = recv_message(client_fd, &buf, &len);
+        rc = proto_recv(client_fd, &hdr, &buf);
         if(rc == ERR_CLOSED) {
             printf("[server] client disconnected\n");
             break;
         }
 
         if(rc != ERR_OK) {
-            err_print("recv_message", rc);
+            err_print("proto_recv", rc);
             break;
         }
 
-        printf("[server] received %u bytes:\n", len);
-        // printf("---------- text ----------\n");
-        // printf("%.*s\n", (int)len, (char *)buf);
-        // printf("--------------------------\n");
+        switch(hdr.type) {
+            case MSG_TEXT:
+                rc = handle_text(client_fd, &hdr, buf);
+                break;   
+            case MSG_IMAGE: 
+                rc = handle_image(client_fd, &hdr, buf);
+                break;
+            default:
+                rc = send_error(client_fd, "unexpected message type");
+                break;
+        }
 
-        uppercase_text(buf, len);
-
-        rc = send_message(client_fd, buf, len);
         free(buf);
         buf = NULL;
 
-        if(rc != ERR_OK) {
-            err_print("send_message", rc);
+        if(rc != ERR_OK) 
             break;
-        }
-        printf("[server] sent %u bytes back\n", len);
     }
 }
 

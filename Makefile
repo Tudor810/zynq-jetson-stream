@@ -13,7 +13,7 @@ CFLAGS += -Isrc
 BUILD  := build
 
 # Code used by both programs
-COMMON := src/common/errors.c src/common/netio.c src/common/protocol.c src/common/image.c src/common/fileio.c
+COMMON := src/common/errors.c src/common/netio.c src/common/protocol.c src/common/image.c src/common/fileio.c src/common/timing.c
 HEADERS := $(wildcard src/common/*.h)
 
 # Each side's own files
