@@ -2,6 +2,7 @@
 #include "common/protocol.h"
 #include "common/image.h"
 #include "common/timing.h"
+#include "filters.h"
 
 #include <errno.h>
 #include <stdio.h>
@@ -21,8 +22,11 @@ static void uppercase_text(uint8_t* buf, uint32_t len) {
     }
 }
 
-static int send_error(int client_fd, const char *err) {
+static int send_error(int client_fd, const char *context, int code) {
     msg_header_t info = {.type = MSG_ERROR};
+
+    char err[128];
+    snprintf(err, sizeof(err), "%s: %s", context, err_str(code));
 
     errno = 0;
     int rc = proto_send(client_fd, &info, err, (uint32_t)strlen(err));
@@ -47,7 +51,6 @@ static int handle_text(int client_fd, const msg_header_t *hdr, uint8_t *buf) {
     msg_header_t info = {
         .type           = MSG_TEXT_RESULT, 
         .server_time_us = elapsed_us, 
-        .payload_size   = hdr->payload_size
     };
 
     errno = 0;
@@ -67,23 +70,35 @@ static int handle_image(int client_fd, const msg_header_t *hdr, const uint8_t *b
     printf("[server] received IMAGE: %ux%u, %u channel(s), %u bytes\n",
        hdr->width, hdr->height, hdr->channels, hdr->payload_size);
     
+
+    image_t image = {
+        .height   = hdr->height, 
+        .width    = hdr->width, 
+        .channels = hdr->channels, 
+        .pixels   = (uint8_t *)buf
+    };
+    image_t result = {0};
     uint64_t t0 = time_now_us();
-    // image_t result;
-    // take time 
-    // process image
-    // take time
-    uint32_t elapsed_us = (uint32_t)time_now_us() - t0;
+    errno = 0;
+    int rc = cpu_grayscale(&image, &result);
+    uint32_t elapsed_us = (uint32_t)(time_now_us() - t0);
+
+    if (rc != ERR_OK) {
+        err_print("cpu_grayscale", rc);
+        return send_error(client_fd, "grayscale failed", rc);
+    }
+
     msg_header_t info = {
         .type           = MSG_IMAGE_RESULT,
-        .width          = hdr->width,
-        .height         = hdr->height,
-        .channels       = hdr->channels,
-        .payload_size   = hdr->payload_size,
+        .width          = result.width,
+        .height         = result.height,
+        .channels       = result.channels,
         .server_time_us = elapsed_us 
     };
     
     errno = 0;
-    int rc = proto_send(client_fd, &info, buf, hdr->payload_size);
+    rc = proto_send(client_fd, &info, result.pixels, (uint32_t)image_size(&result));
+    image_free(&result);
     if(rc != ERR_OK) {
         err_print("proto_send (IMAGE_RESULT)", rc);
         return rc;
@@ -123,7 +138,7 @@ static void handle_client(int client_fd) {
                 rc = handle_image(client_fd, &hdr, buf);
                 break;
             default:
-                rc = send_error(client_fd, "unexpected message type");
+                rc = send_error(client_fd, "unexpected message type", ERR_PROTO_TYPE);
                 break;
         }
 
